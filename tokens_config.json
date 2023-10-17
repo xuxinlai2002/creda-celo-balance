@@ -1,0 +1,17 @@
+{
+    "http":"https://solitary-responsive-putty.celo-mainnet.quiknode.pro/40a3938f2f03f6ae973996eccf6106a9ab27c418",
+    "startBlock":2960,
+    "endBlock":21874877,
+    "postgresHost":"localhost",
+    "postgresPort": 5432,
+    "postgresDBName": "postgres",
+    "postgresUser": "zhangbin",
+    "postgresPassword": "1234",
+    "startDate":"2021-04-20",
+    "endDate":"2021-04-24",
+    "postgresTable":"ods_balance",
+    "output_dir":"/Users/zhangbin/Documents/elawork/src/github.com/xuxinlai2002/chainData/cmd/scripts/output",
+    "result_path":"/Users/zhangbin/Documents/elawork/src/github.com/xuxinlai2002/chainData/cmd/scripts/result"
+}
+
+
