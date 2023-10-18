@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/xuxinlai2002/creda-celo-balance/config"
 	"github.com/xuxinlai2002/creda-celo-balance/tokens"
-	"github.com/xuxinlai2002/creda-celo-balance/transactions"
 	godebug "runtime/debug"
+
+	"github.com/xuxinlai2002/creda-celo-balance/config"
+	"github.com/xuxinlai2002/creda-celo-balance/transactions"
 )
 
 func main() {
@@ -16,22 +17,30 @@ func main() {
 		fmt.Println("tokens start failed", "error", err)
 		panic(any(err.Error()))
 	}
-	_ = cfg
-	err = tokens.Start(cfg)
-	if err != nil {
-		fmt.Println("tokens start failed", "error", err)
-	}
+
+	go func() {
+		err = tokens.Start(cfg)
+		if err != nil {
+			fmt.Println("tokens start failed", "error", err)
+		}
+	}()
 
 	resultCh := make(chan error, 1)
-	transactions.Start(cfg, resultCh)
+	pullBlock, err := transactions.New(cfg)
 	if err != nil {
-		fmt.Println("tokens start failed", "error", err)
+		fmt.Println("pullBlock new failed", "error", err)
+		panic(any(err.Error()))
 	}
+	pullBlock.Start(resultCh)
 
 	for {
 		select {
 		case failedError := <-resultCh:
-			fmt.Println("transactions pull failed", "error", failedError)
+			if failedError != nil {
+				fmt.Println("transactions pull failed", "error", failedError)
+			} else {
+				fmt.Println("block pull completed")
+			}
 			return
 		}
 	}

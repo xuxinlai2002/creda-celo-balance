@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/celo-org/celo-blockchain/crypto"
-	"github.com/celo-org/celo-blockchain/eth/tracers"
 	"math/big"
 
 	"github.com/celo-org/celo-blockchain"
 	"github.com/celo-org/celo-blockchain/common"
 	"github.com/celo-org/celo-blockchain/common/hexutil"
 	"github.com/celo-org/celo-blockchain/core/types"
+	"github.com/celo-org/celo-blockchain/crypto"
+	"github.com/celo-org/celo-blockchain/eth/tracers"
 	"github.com/celo-org/celo-blockchain/rpc"
 )
 
@@ -60,19 +60,6 @@ func (h *headerNumber) UnmarshalJSON(input []byte) error {
 
 func (c *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	return c.getBlock(ctx, "eth_getBlockByNumber", toBlockNumArg(number), true)
-}
-
-type InternalTx struct {
-	From  string `json:"from,omitempty"`
-	To    string `json:"to,omitempty"`
-	Value uint64 `json:"value,omitempty"`
-	Calls string `json:"calls,omitempty"`
-
-	GasUsed uint64 `json:"gasUsed,omitempty"`
-	Output  string `json:"output,omitempty"`
-	Input   string `json:"input,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Gas     uint64 `json:"gas,omitempty"`
 }
 
 func (c *Client) TraceTx(ctx context.Context, txHash string) (map[string]interface{}, error) {
@@ -273,11 +260,11 @@ func (s *senderFromServer) Sender(tx *types.Transaction) (common.Address, error)
 }
 
 func (s *senderFromServer) ChainID() *big.Int {
-	panic("can't sign with senderFromServer")
+	panic(any("can't sign with senderFromServer"))
 }
 func (s *senderFromServer) Hash(tx *types.Transaction) common.Hash {
-	panic("can't sign with senderFromServer")
+	panic(any("can't sign with senderFromServer"))
 }
 func (s *senderFromServer) SignatureValues(tx *types.Transaction, sig []byte) (R, S, V *big.Int, err error) {
-	panic("can't sign with senderFromServer")
+	panic(any("can't sign with senderFromServer"))
 }
