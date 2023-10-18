@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/celo-org/celo-blockchain/crypto"
+	"github.com/celo-org/celo-blockchain/eth/tracers"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/celo-org/celo-blockchain"
+	"github.com/celo-org/celo-blockchain/common"
+	"github.com/celo-org/celo-blockchain/common/hexutil"
+	"github.com/celo-org/celo-blockchain/core/types"
+	"github.com/celo-org/celo-blockchain/rpc"
 )
 
 type Client struct {
@@ -57,6 +58,33 @@ func (h *headerNumber) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+func (c *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	return c.getBlock(ctx, "eth_getBlockByNumber", toBlockNumArg(number), true)
+}
+
+type InternalTx struct {
+	From  string `json:"from,omitempty"`
+	To    string `json:"to,omitempty"`
+	Value uint64 `json:"value,omitempty"`
+	Calls string `json:"calls,omitempty"`
+
+	GasUsed uint64 `json:"gasUsed,omitempty"`
+	Output  string `json:"output,omitempty"`
+	Input   string `json:"input,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Gas     uint64 `json:"gas,omitempty"`
+}
+
+func (c *Client) TraceTx(ctx context.Context, txHash string) (map[string]interface{}, error) {
+	var result map[string]interface{} = make(map[string]interface{}, 0)
+	tracerStr := "callTracer"
+	err := c.rpcClient.CallContext(ctx, &result, "debug_traceTransaction", txHash, tracers.TraceConfig{Tracer: &tracerStr})
+	if err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
 func (c *Client) LatestBlock() (*big.Int, error) {
 	var head *headerNumber
 
@@ -78,10 +106,16 @@ func (c *Client) TransactionReceipt(txHash common.Hash) (*types.Receipt, error) 
 	err := c.rpcClient.CallContext(context.Background(), &r, "eth_getTransactionReceipt", txHash)
 	if err == nil {
 		if r == nil {
-			return nil, ethereum.NotFound
+			return nil, celo.NotFound
 		}
 	}
 	return r, err
+}
+
+func (c *Client) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	var result hexutil.Big
+	err := c.rpcClient.CallContext(ctx, &result, "eth_getBalance", account, toBlockNumArg(blockNumber))
+	return (*big.Int)(&result), err
 }
 
 func (c *Client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
@@ -101,8 +135,8 @@ func (c *Client) CallContract(ctx context.Context, callArgs map[string]interface
 	return hex, nil
 }
 
-func (c *Client) BuildQuery(contractAddress string, sig []byte, startBlock *big.Int, endBlock *big.Int) ethereum.FilterQuery {
-	query := ethereum.FilterQuery{
+func (c *Client) BuildQuery(contractAddress string, sig []byte, startBlock *big.Int, endBlock *big.Int) celo.FilterQuery {
+	query := celo.FilterQuery{
 		FromBlock: startBlock,
 		ToBlock:   endBlock,
 		Addresses: []common.Address{common.HexToAddress(contractAddress)},
@@ -114,7 +148,7 @@ func (c *Client) BuildQuery(contractAddress string, sig []byte, startBlock *big.
 }
 
 // FilterLogs executes a filter query.
-func (c *Client) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
+func (c *Client) FilterLogs(ctx context.Context, q celo.FilterQuery) ([]types.Log, error) {
 	var result []types.Log
 	arg, err := toFilterArg(q)
 	if err != nil {
@@ -124,7 +158,7 @@ func (c *Client) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]type
 	return result, err
 }
 
-func toFilterArg(q ethereum.FilterQuery) (interface{}, error) {
+func toFilterArg(q celo.FilterQuery) (interface{}, error) {
 	arg := map[string]interface{}{
 		"address": q.Addresses,
 		"topics":  q.Topics,
@@ -150,4 +184,100 @@ func toBlockNumArg(number *big.Int) string {
 		return "latest"
 	}
 	return hexutil.EncodeBig(number)
+}
+
+type rpcBlock struct {
+	Hash           common.Hash           `json:"hash"`
+	Transactions   []rpcTransaction      `json:"transactions"`
+	Randomness     *types.Randomness     `json:"randomness"`
+	EpochSnarkData *types.EpochSnarkData `json:"epochSnarkData"`
+}
+
+type rpcTransaction struct {
+	tx *types.Transaction
+	txExtraInfo
+}
+
+type txExtraInfo struct {
+	BlockNumber *string         `json:"blockNumber,omitempty"`
+	BlockHash   *common.Hash    `json:"blockHash,omitempty"`
+	From        *common.Address `json:"from,omitempty"`
+}
+
+func (tx *rpcTransaction) UnmarshalJSON(msg []byte) error {
+	if err := json.Unmarshal(msg, &tx.tx); err != nil {
+		return err
+	}
+	return json.Unmarshal(msg, &tx.txExtraInfo)
+}
+
+func (c *Client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
+	var raw json.RawMessage
+	err := c.rpcClient.CallContext(ctx, &raw, method, args...)
+	if err != nil {
+		return nil, err
+	} else if len(raw) == 0 {
+		return nil, errors.New("not found")
+	}
+	// Decode header and transactions.
+	var head *types.Header
+	var body rpcBlock
+	if err := json.Unmarshal(raw, &head); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return nil, err
+	}
+	if head.TxHash == types.EmptyRootHash && len(body.Transactions) > 0 {
+		return nil, fmt.Errorf("server returned non-empty transaction list but block header indicates no transactions")
+	}
+	if head.TxHash != types.EmptyRootHash && len(body.Transactions) == 0 {
+		return nil, fmt.Errorf("server returned empty transaction list but block header indicates transactions")
+	}
+	// Fill the sender cache of transactions in the block.
+	txs := make([]*types.Transaction, len(body.Transactions))
+	for i, tx := range body.Transactions {
+		if tx.From != nil {
+			setSenderFromServer(tx.tx, *tx.From, body.Hash)
+		}
+		txs[i] = tx.tx
+	}
+	return types.NewBlockWithHeader(head).WithBody(txs, body.Randomness, body.EpochSnarkData), nil
+}
+
+// senderFromServer is a types.Signer that remembers the sender address returned by the RPC
+// server. It is stored in the transaction's sender address cache to avoid an additional
+// request in TransactionSender.
+type senderFromServer struct {
+	addr      common.Address
+	blockhash common.Hash
+}
+
+var errNotCached = errors.New("sender not cached")
+
+func setSenderFromServer(tx *types.Transaction, addr common.Address, block common.Hash) {
+	// Use types.Sender for side-effect to store our signer into the cache.
+	types.Sender(&senderFromServer{addr, block}, tx)
+}
+
+func (s *senderFromServer) Equal(other types.Signer) bool {
+	os, ok := other.(*senderFromServer)
+	return ok && os.blockhash == s.blockhash
+}
+
+func (s *senderFromServer) Sender(tx *types.Transaction) (common.Address, error) {
+	if s.blockhash == (common.Hash{}) {
+		return common.Address{}, errNotCached
+	}
+	return s.addr, nil
+}
+
+func (s *senderFromServer) ChainID() *big.Int {
+	panic("can't sign with senderFromServer")
+}
+func (s *senderFromServer) Hash(tx *types.Transaction) common.Hash {
+	panic("can't sign with senderFromServer")
+}
+func (s *senderFromServer) SignatureValues(tx *types.Transaction, sig []byte) (R, S, V *big.Int, err error) {
+	panic("can't sign with senderFromServer")
 }

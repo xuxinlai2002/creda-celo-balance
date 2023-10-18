@@ -7,8 +7,8 @@
     "postgresDBName": "postgres",
     "postgresUser": "zhangbin",
     "postgresPassword": "1234",
-    "startDate":"2021-04-20",
-    "endDate":"2021-04-24",
+    "pullStartHeight": 21952235,
+    "pullEndHeight": 21952235,
     "postgresTable":"ods_balance",
     "output_dir":"/Users/zhangbin/Documents/elawork/src/github.com/xuxinlai2002/chainData/cmd/scripts/output",
     "result_path":"/Users/zhangbin/Documents/elawork/src/github.com/xuxinlai2002/chainData/cmd/scripts/result"
