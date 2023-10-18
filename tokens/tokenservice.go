@@ -54,7 +54,6 @@ func processERC20Tokens(cfg *config.Config) {
 				for _, vlog := range logs {
 					var transferEvent LogTransfer
 					transferEvent.Tokens = big.NewInt(0).SetBytes(vlog.Data)
-
 					transferEvent.From = common.HexToAddress(vlog.Topics[1].Hex())
 					transferEvent.To = common.HexToAddress(vlog.Topics[2].Hex())
 
