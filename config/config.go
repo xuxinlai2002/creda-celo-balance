@@ -21,8 +21,8 @@ type Config struct {
 	PostgresUser     string `json:"postgresUser,omitempty"`
 	PostgresPassword string `json:"postgresPassword,omitempty"`
 
-	StartDate string `json:"StartDate,omitempty"`
-	EndDate   string `json:"endDate,omitempty"`
+	PullStartHeight uint64 `json:"pullStartHeight,omitempty"`
+	PullEndHeight   uint64 `json:"pullEndHeight,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -37,8 +37,8 @@ func DefaultConfig() Config {
 		PostgresUser:     "",
 		PostgresPassword: "",
 
-		StartDate: "2021-04-20",
-		EndDate:   "",
+		PullStartHeight: 0,
+		PullEndHeight:   0,
 	}
 }
 
@@ -62,11 +62,11 @@ func LoadConfig() (*Config, error) {
 }
 
 func (cfg *Config) ValidateConfig() error {
-	if cfg.StartDate == "" {
-		return errors.New("StartDate is empty")
+	if cfg.PullStartHeight > cfg.PullEndHeight {
+		return errors.New("pull start height is smaller to pull end height")
 	}
-	if cfg.EndDate == "" {
-		return errors.New("EndDate is empty")
+	if cfg.PullEndHeight == 0 {
+		return errors.New("PullEndHeight is empty")
 	}
 	if cfg.PostgresDBName == "" {
 		return errors.New("PostgresDBName is empty")
