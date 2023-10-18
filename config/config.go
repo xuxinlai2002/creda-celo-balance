@@ -23,6 +23,9 @@ type Config struct {
 
 	PullStartHeight uint64 `json:"pullStartHeight,omitempty"`
 	PullEndHeight   uint64 `json:"pullEndHeight,omitempty"`
+
+	OutputDir  string `json:"outputDir,omitempty"`
+	ResultPath string `json:"resultPath,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -39,6 +42,9 @@ func DefaultConfig() Config {
 
 		PullStartHeight: 0,
 		PullEndHeight:   0,
+
+		OutputDir:  "",
+		ResultPath: "",
 	}
 }
 

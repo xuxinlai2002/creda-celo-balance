@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
@@ -13,6 +14,8 @@ import (
 
 var celoClientRpc *client.Client
 
+var outputFile *os.File
+
 func Start(cfg *config.Config, results chan<- error) {
 	cli, err := client.Dial(cfg.HTTP)
 	if err != nil {
@@ -20,13 +23,26 @@ func Start(cfg *config.Config, results chan<- error) {
 		results <- err
 	}
 	celoClientRpc = cli
+
+	outputFullPath := cfg.OutputDir + "/output" + ".txt"
+	outputFile, err = os.OpenFile(outputFullPath, os.O_WRONLY|os.O_CREATE, 0644)
+
+	outputFile.Write([]byte("from,to,value\n"))
+
+	if err != nil {
+		fmt.Println("can not open the file:", err)
+		return
+	}
+
 	go func() {
 		err = pullBlock(cfg)
 		if err != nil {
 			fmt.Println("pull block failed", "error", err)
 			results <- err
 		}
+		defer outputFile.Close()
 	}()
+
 }
 
 func pullBlock(cfg *config.Config) error {
@@ -58,12 +74,20 @@ func interfaceToInternalTx(items []interface{}) {
 		if v, ok := item["value"]; ok {
 			tx.Value, _ = hexutil.DecodeUint64(v.(string))
 		}
-		fmt.Println("tx==", tx)
+
 		if item["calls"] != nil {
 			recursionInternalTx(item)
 		}
-	}
 
+		fmt.Print(tx.From)
+		line := fmt.Sprintf("%s,%s,%d\n", tx.From, tx.To, tx.Value)
+
+		_, err := outputFile.Write([]byte(line))
+		if err != nil {
+			fmt.Println("write file error:", err)
+			return
+		}
+	}
 }
 
 func recursionInternalTx(txs map[string]interface{}) error {

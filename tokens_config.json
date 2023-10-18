@@ -10,8 +10,8 @@
     "pullStartHeight": 21952235,
     "pullEndHeight": 21952235,
     "postgresTable":"ods_balance",
-    "output_dir":"./history/recordTx",
-    "result_path":"./history/recordValue"
+    "outputDir":"./history/recordTx",
+    "resultPath":"./history/recordValue"
 }
 
 
