@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 )
 
-var DefaultConfigFilename = "tokens_config.json"
+var DefaultConfigFilename = "config.json"
 
 type Config struct {
 	HTTP       string `json:"http,omitempty"`

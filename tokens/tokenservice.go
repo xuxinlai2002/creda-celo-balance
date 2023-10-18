@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/celo-org/celo-blockchain/common"
-	ecommon "github.com/ethereum/go-ethereum/common"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 )
@@ -17,8 +16,8 @@ import (
 var rpcClient *client.Client
 
 type LogTransfer struct {
-	From   ecommon.Address
-	To     ecommon.Address
+	From   common.Address
+	To     common.Address
 	Tokens *big.Int
 }
 
@@ -27,8 +26,8 @@ type TokenRecord struct {
 	BlockNumber uint64
 	Timestamp   uint64
 	TxHash      common.Hash
-	From        ecommon.Address
-	To          ecommon.Address
+	From        common.Address
+	To          common.Address
 	Value       *big.Int
 }
 
@@ -99,9 +98,8 @@ func processERC20Tokens(cfg *config.Config) {
 					} else {
 						var transferEvent LogTransfer
 						transferEvent.Tokens = big.NewInt(0).SetBytes(vlog.Data)
-
-						transferEvent.From = ecommon.HexToAddress(vlog.Topics[1].Hex())
-						transferEvent.To = ecommon.HexToAddress(vlog.Topics[2].Hex())
+						transferEvent.From = common.HexToAddress(vlog.Topics[1].Hex())
+						transferEvent.To = common.HexToAddress(vlog.Topics[2].Hex())
 
 						tr := TokenRecord{
 							CoinID:      tokenInfo.CoinID,

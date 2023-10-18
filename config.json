@@ -7,11 +7,11 @@
     "postgresDBName": "postgres",
     "postgresUser": "zhangbin",
     "postgresPassword": "1234",
-    "pullStartHeight": 21952235,
+    "pullStartHeight": 2000,
     "pullEndHeight": 21952235,
     "postgresTable":"ods_balance",
-    "outputDir":"./history/recordTx",
-    "resultPath":"./history/recordValue"
+    "outputDir":"./history/recordTx/",
+    "resultPath":"./history/recordValue/"
 }
 
 

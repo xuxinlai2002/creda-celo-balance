@@ -3,95 +3,199 @@ package transactions
 import (
 	"context"
 	"fmt"
-	"math/big"
-	"os"
-
+	"github.com/celo-org/celo-blockchain/common"
+	"github.com/celo-org/celo-blockchain/core/types"
+	"github.com/celo-org/celo-blockchain/params"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
+	"github.com/xuxinlai2002/creda-celo-balance/tokens"
+	"math/big"
+	"os"
+	"time"
 
 	"github.com/celo-org/celo-blockchain/common/hexutil"
+	"github.com/xuxinlai2002/creda-celo-balance/utils"
 )
 
-var celoClientRpc *client.Client
+type InternalTx struct {
+	From  string
+	To    string
+	Value uint64
+	Calls string
+	Type  string
+}
 
-var outputFile *os.File
+type BlockPull struct {
+	client     *client.Client
+	config     *config.Config
+	coinID     string
+	pullTxList map[string][]*tokens.TokenRecord
+}
 
-func Start(cfg *config.Config, results chan<- error) {
+func New(cfg *config.Config) (*BlockPull, error) {
 	cli, err := client.Dial(cfg.HTTP)
 	if err != nil {
-		fmt.Println(err)
-		results <- err
+		return nil, err
 	}
-	celoClientRpc = cli
-
-	outputFullPath := cfg.OutputDir + "/output" + ".txt"
-	outputFile, err = os.OpenFile(outputFullPath, os.O_WRONLY|os.O_CREATE, 0644)
-
-	outputFile.Write([]byte("from,to,value\n"))
-
-	if err != nil {
-		fmt.Println("can not open the file:", err)
-		return
+	pull := &BlockPull{
+		client: cli,
+		config: cfg,
+		coinID: "5567",
 	}
+	return pull, nil
+}
 
+func (p *BlockPull) Start(results chan<- error) {
 	go func() {
-		err = pullBlock(cfg)
-		if err != nil {
-			fmt.Println("pull block failed", "error", err)
-			results <- err
-		}
-		defer outputFile.Close()
+		err := p.pullBlock()
+		p.saveTxToFile(p.pullTxList)
+		results <- err
 	}()
-
 }
 
-func pullBlock(cfg *config.Config) error {
+func (p *BlockPull) getTableNameByTimeStamp(timestamp uint64) string {
+	t := time.Unix(int64(timestamp), 0)
+	date := fmt.Sprintf("tx_%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
+	return date
+}
+
+func (p *BlockPull) saveTxToFile(datas map[string][]*tokens.TokenRecord) {
+	for k, v := range datas {
+		if err := p.saveToFile(k, v); err != nil {
+			fmt.Printf("save transaction list to file err: %v\n", err)
+		}
+		delete(datas, k)
+	}
+}
+
+func (p *BlockPull) saveToFile(fileName string, data []*tokens.TokenRecord) error {
+	filePath := p.config.OutputDir + fileName + ".txt"
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		fmt.Println("Error getting file info:", "fileName", fileName, "error", err)
+		return err
+	}
+	title := "coinID,blockNumber,timestamp, txHash,from,to,value\n"
+	if info.Size() > 0 {
+		title = ""
+	}
+
+	_, err = f.WriteString(title)
+	if err != nil {
+		return err
+	}
+	for _, d := range data {
+		line := fmt.Sprintf("%d,%d,%d,%s,%s,%s,%d\n", d.CoinID, d.BlockNumber, d.Timestamp, d.TxHash, d.From, d.To, d.Value)
+		_, err = f.WriteString(line)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *BlockPull) pullBlock() error {
+	p.pullTxList = make(map[string][]*tokens.TokenRecord)
+	startHeight := p.config.PullStartHeight
+	progress, err := utils.GetCurrentHeight(p.config.OutputDir)
+	if err == nil && progress > startHeight {
+		startHeight = progress + 1
+	}
+	endHeight := p.config.PullEndHeight
 	ctx := context.Background()
-	for i := cfg.PullStartHeight; i <= cfg.PullEndHeight; i++ {
-		b, err := celoClientRpc.BlockByNumber(ctx, big.NewInt(0).SetUint64(i))
+	for i := startHeight; i <= endHeight; i++ {
+		b, err := p.client.BlockByNumber(ctx, big.NewInt(0).SetUint64(i))
 		if err != nil {
 			return err
 		}
+		filePath := p.getTableNameByTimeStamp(b.Time())
+		if _, ok := p.pullTxList[filePath]; !ok {
+			if i > startHeight {
+				p.saveTxToFile(p.pullTxList)
+				p.pullTxList = make(map[string][]*tokens.TokenRecord)
+			}
+		}
+		signer := types.MakeSigner(params.MainnetChainConfig, b.Number())
+		fmt.Println("getBlock", b.NumberU64())
+		for _, tx := range b.Transactions() {
+			fmt.Println("trace tx", tx.Hash().String())
+			if tx.Value().Cmp(big.NewInt(0)) > 0 {
+				from, errMsg := types.Sender(signer, tx)
+				if errMsg == nil {
+					coinID, ok := big.NewInt(0).SetString(p.coinID, 10)
+					if !ok {
+						fmt.Println("CoinID is not correct", "coinID", p.coinID)
+					}
+					tr := &tokens.TokenRecord{
+						CoinID:      coinID.Uint64(),
+						BlockNumber: b.NumberU64(),
+						Timestamp:   b.Header().Time,
+						TxHash:      tx.Hash(),
+						From:        from,
+						To:          *tx.To(),
+						Value:       tx.Value(),
+					}
+					p.addPullTxRecord(filePath, tr)
+				}
+			}
 
-		info, err := celoClientRpc.TraceTx(ctx, b.Transactions()[7].Hash().String())
-		if err != nil {
-			return err
+			info, err := p.client.TraceTx(ctx, tx.Hash().String())
+			if err != nil {
+				return err
+			}
+			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
 		}
 
-		recursionInternalTx(info)
+		if b.NumberU64()%1 == 0 {
+			utils.WriteCurrentHeight(p.config.OutputDir, b.NumberU64())
+		}
 	}
 	return nil
 }
 
-func interfaceToInternalTx(items []interface{}) {
-	for i := 0; i < len(items); i++ {
-		item := items[i].(map[string]interface{})
-		var tx = &client.InternalTx{
-			From: item["from"].(string),
-			To:   item["to"].(string),
-			Type: item["type"].(string),
-		}
-		if v, ok := item["value"]; ok {
-			tx.Value, _ = hexutil.DecodeUint64(v.(string))
-		}
-
-		if item["calls"] != nil {
-			recursionInternalTx(item)
-		}
-
-		fmt.Print(tx.From)
-		line := fmt.Sprintf("%s,%s,%d\n", tx.From, tx.To, tx.Value)
-
-		_, err := outputFile.Write([]byte(line))
-		if err != nil {
-			fmt.Println("write file error:", err)
-			return
-		}
+func (p *BlockPull) addPullTxRecord(filePath string, tr *tokens.TokenRecord) {
+	if _, ok := p.pullTxList[filePath]; ok {
+		p.pullTxList[filePath] = append(p.pullTxList[filePath], tr)
+	} else {
+		p.pullTxList[filePath] = []*tokens.TokenRecord{tr}
 	}
 }
 
-func recursionInternalTx(txs map[string]interface{}) error {
-	tx := txs["calls"].([]interface{})
-	interfaceToInternalTx(tx)
-	return nil
+func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID common.Hash, blockHeight, timestamp uint64, filePath string) {
+	var tx = &InternalTx{
+		From: txInfo["from"].(string),
+		To:   txInfo["to"].(string),
+		Type: txInfo["type"].(string),
+	}
+	if v, ok := txInfo["value"]; ok {
+		tx.Value, _ = hexutil.DecodeUint64(v.(string))
+	}
+	if tx.Value != 0 && tx.Type == "CALL" {
+		coinID, ok := big.NewInt(0).SetString(p.coinID, 10)
+		if !ok {
+			fmt.Println("CoinID is not correct", "coinID", p.coinID)
+		}
+		tr := &tokens.TokenRecord{
+			CoinID:      coinID.Uint64(),
+			BlockNumber: blockHeight,
+			Timestamp:   timestamp,
+			TxHash:      txID,
+			From:        common.HexToAddress(tx.From),
+			To:          common.HexToAddress(tx.To),
+			Value:       big.NewInt(0).SetUint64(tx.Value),
+		}
+		p.addPullTxRecord(filePath, tr)
+	}
+
+	if calls, ok := txInfo["calls"]; ok {
+		var items = calls.([]interface{})
+		for i := 0; i < len(items); i++ {
+			p.processInteralTxsInfo(items[i].(map[string]interface{}), txID, blockHeight, timestamp, filePath)
+		}
+	}
 }
