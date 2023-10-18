@@ -5,10 +5,23 @@ go 1.20
 require github.com/ethereum/go-ethereum v1.13.3
 
 require (
+	github.com/celo-org/celo-bls-go v0.3.4 // indirect
+	github.com/celo-org/celo-bls-go-android v0.3.3 // indirect
+	github.com/celo-org/celo-bls-go-ios v0.3.3 // indirect
+	github.com/celo-org/celo-bls-go-linux v0.3.3 // indirect
+	github.com/celo-org/celo-bls-go-macos v0.3.3 // indirect
+	github.com/celo-org/celo-bls-go-other v0.3.3 // indirect
+	github.com/celo-org/celo-bls-go-windows v0.3.3 // indirect
+	github.com/deckarep/golang-set v0.0.0-20180603214616-504e848d77ea // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
+)
+
+require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/bits-and-blooms/bitset v1.5.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
+	github.com/celo-org/celo-blockchain v1.8.0
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.10.0 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.3.0 // indirect
