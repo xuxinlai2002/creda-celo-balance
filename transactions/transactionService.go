@@ -151,7 +151,7 @@ func (p *BlockPull) pullBlock() error {
 			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
 		}
 
-		if b.NumberU64()%1 == 0 {
+		if b.NumberU64()%1000 == 0 {
 			utils.WriteCurrentHeight(p.config.OutputDir, b.NumberU64())
 		}
 	}

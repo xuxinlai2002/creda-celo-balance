@@ -11,7 +11,9 @@
     "pullEndHeight": 21952235,
     "postgresTable":"ods_balance",
     "outputDir":"./history/recordTx/",
-    "resultPath":"./history/recordValue/"
+    "resultPath":"./history/recordValue/",
+    "statisticsDateBegin":"2020-04-23",
+    "statisticsDateEnd":"2023-10-20"
 }
 
 

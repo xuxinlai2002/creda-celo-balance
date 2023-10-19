@@ -43,10 +43,11 @@ func Start(cfg *config.Config) error {
 	return nil
 }
 
-func saveToFile(date string, data []TokenRecord) error {
-	filename := fmt.Sprintf("event%v_%v.txt", date, data[0].BlockNumber)
-	fmt.Printf("save %v record to %v\n", len(data), filename)
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE, 0666)
+func saveToFile(date string, data []TokenRecord, cfg *config.Config) error {
+	filename := fmt.Sprintf("event%v.txt", date)
+	filePath := cfg.OutputDir + filename
+	fmt.Printf("save %v record to %v\n", len(data), filePath)
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
@@ -100,7 +101,9 @@ func processERC20Tokens(cfg *config.Config) {
 						transferEvent.Tokens = big.NewInt(0).SetBytes(vlog.Data)
 						transferEvent.From = common.HexToAddress(vlog.Topics[1].Hex())
 						transferEvent.To = common.HexToAddress(vlog.Topics[2].Hex())
-
+						if transferEvent.Tokens.Cmp(big.NewInt(0)) <= 0 {
+							continue
+						}
 						tr := TokenRecord{
 							CoinID:      tokenInfo.CoinID,
 							BlockNumber: vlog.BlockNumber,
@@ -122,7 +125,7 @@ func processERC20Tokens(cfg *config.Config) {
 						} else {
 							if len(tokenDaysData) > 0 {
 								for k, v := range tokenDaysData {
-									if err := saveToFile(k, v); err != nil {
+									if err := saveToFile(k, v, cfg); err != nil {
 										fmt.Printf("save token event to file err: %v\n", err)
 									}
 									delete(tokenDaysData, k)
@@ -138,7 +141,7 @@ func processERC20Tokens(cfg *config.Config) {
 
 	if len(tokenDaysData) > 0 {
 		for k, v := range tokenDaysData {
-			if err := saveToFile(k, v); err != nil {
+			if err := saveToFile(k, v, cfg); err != nil {
 				fmt.Printf("save token event to file err: %v\n", err)
 			}
 			delete(tokenDaysData, k)
