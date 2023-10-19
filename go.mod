@@ -2,6 +2,8 @@ module github.com/xuxinlai2002/creda-celo-balance
 
 go 1.20
 
+require github.com/lib/pq v1.0.0
+
 require (
 	filippo.io/edwards25519 v1.0.0-alpha.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect

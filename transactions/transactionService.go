@@ -8,9 +8,9 @@ import (
 	"github.com/celo-org/celo-blockchain/params"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
-	"github.com/xuxinlai2002/creda-celo-balance/tokens"
+	"github.com/xuxinlai2002/creda-celo-balance/db"
+	ctypes "github.com/xuxinlai2002/creda-celo-balance/types"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/celo-org/celo-blockchain/common/hexutil"
@@ -29,7 +29,8 @@ type BlockPull struct {
 	client     *client.Client
 	config     *config.Config
 	coinID     string
-	pullTxList map[string][]*tokens.TokenRecord
+	pullTxList map[string][]*ctypes.TokenRecord
+	dataBase   *db.PostgresDB
 }
 
 func New(cfg *config.Config) (*BlockPull, error) {
@@ -37,10 +38,15 @@ func New(cfg *config.Config) (*BlockPull, error) {
 	if err != nil {
 		return nil, err
 	}
+	database, err := db.NewDB(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword)
+	if err != nil {
+		return nil, err
+	}
 	pull := &BlockPull{
-		client: cli,
-		config: cfg,
-		coinID: "5567",
+		client:   cli,
+		config:   cfg,
+		coinID:   "5567",
+		dataBase: database,
 	}
 	return pull, nil
 }
@@ -48,7 +54,7 @@ func New(cfg *config.Config) (*BlockPull, error) {
 func (p *BlockPull) Start(results chan<- error) {
 	go func() {
 		err := p.pullBlock()
-		p.saveTxToFile(p.pullTxList)
+		p.persistToDB(p.pullTxList)
 		results <- err
 	}()
 }
@@ -58,49 +64,66 @@ func (p *BlockPull) getTableNameByTimeStamp(timestamp uint64) string {
 	date := fmt.Sprintf("tx_%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
 	return date
 }
-
-func (p *BlockPull) saveTxToFile(datas map[string][]*tokens.TokenRecord) {
-	for k, v := range datas {
-		if err := p.saveToFile(k, v); err != nil {
-			fmt.Printf("save transaction list to file err: %v\n", err)
-		}
-		delete(datas, k)
-	}
-}
-
-func (p *BlockPull) saveToFile(fileName string, data []*tokens.TokenRecord) error {
-	filePath := p.config.OutputDir + fileName + ".txt"
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0666)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	info, err := f.Stat()
-	if err != nil {
-		fmt.Println("Error getting file info:", "fileName", fileName, "error", err)
-		return err
-	}
-	title := "coinID,blockNumber,timestamp, txHash,from,to,value\n"
-	if info.Size() > 0 {
-		title = ""
-	}
-
-	_, err = f.WriteString(title)
-	if err != nil {
-		return err
-	}
-	for _, d := range data {
-		line := fmt.Sprintf("%d,%d,%d,%s,%s,%s,%d\n", d.CoinID, d.BlockNumber, d.Timestamp, d.TxHash, d.From, d.To, d.Value)
-		_, err = f.WriteString(line)
+func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
+	//p.dataBase.CreatePullTxTable()
+	for filename, datas := range records {
+		fmt.Println("filename", filename, "datas", datas)
+		err := p.dataBase.CreatePullTxTable(filename)
 		if err != nil {
-			return err
+			fmt.Println("persistToDB CreatePullTxTable", "error", err)
+			panic(any(err.Error()))
+		}
+		err = p.dataBase.InsertTokenRecords(filename, datas)
+		if err != nil {
+			fmt.Println("persistToDB failed", "error", err)
+			panic(any(err.Error()))
 		}
 	}
-	return nil
 }
+
+//
+//func (p *BlockPull) saveTxToFile(datas map[string][]*tokens.TokenRecord) {
+//	for k, v := range datas {
+//		if err := p.saveToFile(k, v); err != nil {
+//			fmt.Printf("save transaction list to file err: %v\n", err)
+//		}
+//		delete(datas, k)
+//	}
+//}
+//
+//func (p *BlockPull) saveToFile(fileName string, data []*tokens.TokenRecord) error {
+//	filePath := p.config.OutputDir + fileName + ".txt"
+//	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0666)
+//	if err != nil {
+//		return err
+//	}
+//	defer f.Close()
+//	info, err := f.Stat()
+//	if err != nil {
+//		fmt.Println("Error getting file info:", "fileName", fileName, "error", err)
+//		return err
+//	}
+//	title := "coinID,blockNumber,timestamp, txHash,from,to,value\n"
+//	if info.Size() > 0 {
+//		title = ""
+//	}
+//
+//	_, err = f.WriteString(title)
+//	if err != nil {
+//		return err
+//	}
+//	for _, d := range data {
+//		line := fmt.Sprintf("%d,%d,%d,%s,%s,%s,%d\n", d.CoinID, d.BlockNumber, d.Timestamp, d.TxHash, d.From, d.To, d.Value)
+//		_, err = f.WriteString(line)
+//		if err != nil {
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 func (p *BlockPull) pullBlock() error {
-	p.pullTxList = make(map[string][]*tokens.TokenRecord)
+	p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 	startHeight := p.config.PullStartHeight
 	progress, err := utils.GetCurrentHeight(p.config.OutputDir)
 	if err == nil && progress > startHeight {
@@ -116,8 +139,8 @@ func (p *BlockPull) pullBlock() error {
 		filePath := p.getTableNameByTimeStamp(b.Time())
 		if _, ok := p.pullTxList[filePath]; !ok {
 			if i > startHeight {
-				p.saveTxToFile(p.pullTxList)
-				p.pullTxList = make(map[string][]*tokens.TokenRecord)
+				p.persistToDB(p.pullTxList)
+				p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 			}
 		}
 		signer := types.MakeSigner(params.MainnetChainConfig, b.Number())
@@ -131,7 +154,7 @@ func (p *BlockPull) pullBlock() error {
 					if !ok {
 						fmt.Println("CoinID is not correct", "coinID", p.coinID)
 					}
-					tr := &tokens.TokenRecord{
+					tr := &ctypes.TokenRecord{
 						CoinID:      coinID.Uint64(),
 						BlockNumber: b.NumberU64(),
 						Timestamp:   b.Header().Time,
@@ -158,11 +181,11 @@ func (p *BlockPull) pullBlock() error {
 	return nil
 }
 
-func (p *BlockPull) addPullTxRecord(filePath string, tr *tokens.TokenRecord) {
+func (p *BlockPull) addPullTxRecord(filePath string, tr *ctypes.TokenRecord) {
 	if _, ok := p.pullTxList[filePath]; ok {
 		p.pullTxList[filePath] = append(p.pullTxList[filePath], tr)
 	} else {
-		p.pullTxList[filePath] = []*tokens.TokenRecord{tr}
+		p.pullTxList[filePath] = []*ctypes.TokenRecord{tr}
 	}
 }
 
@@ -180,7 +203,7 @@ func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID co
 		if !ok {
 			fmt.Println("CoinID is not correct", "coinID", p.coinID)
 		}
-		tr := &tokens.TokenRecord{
+		tr := &ctypes.TokenRecord{
 			CoinID:      coinID.Uint64(),
 			BlockNumber: blockHeight,
 			Timestamp:   timestamp,

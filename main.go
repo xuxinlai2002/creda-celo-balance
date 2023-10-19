@@ -5,7 +5,6 @@ import (
 	godebug "runtime/debug"
 
 	"github.com/xuxinlai2002/creda-celo-balance/config"
-	"github.com/xuxinlai2002/creda-celo-balance/tokens"
 	"github.com/xuxinlai2002/creda-celo-balance/transactions"
 )
 
@@ -19,16 +18,16 @@ func main() {
 	}
 
 	go func() {
-		err = tokens.Start(cfg)
-		if err != nil {
-			fmt.Println("tokens start failed", "error", err)
-		}
+		//err = tokens.Start(cfg)
+		//if err != nil {
+		//	fmt.Println("tokens start failed", "error", err)
+		//}
 	}()
 
 	resultCh := make(chan error, 1)
 	pullBlock, err := transactions.New(cfg)
 	if err != nil {
-		fmt.Println("pullBlock new failed", "error", err)
+		fmt.Println("pullBlock initialized failed", "error", err)
 		panic(any(err.Error()))
 	}
 	pullBlock.Start(resultCh)
