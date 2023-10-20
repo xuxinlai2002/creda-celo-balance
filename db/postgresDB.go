@@ -52,73 +52,65 @@ func (p *PostgresDB) Close() error {
 	return p.db.Close()
 }
 
-func (p *PostgresDB) CreatePullTxTable(tableName string) error {
-	exists, err := p.tableExists(tableName)
-	if err != nil {
-		fmt.Println("CreatePullTxTable get table information failed", "error", err)
-		return err
-	} else {
-		if exists {
-			return nil
-		} else { //coinid, blocknumber, timestamp, txhash, fromaddress, toaddress, value
-			createTableSQL := fmt.Sprintf(`CREATE TABLE %s (coinID INTEGER, blocknumber BIGINT, timestamp TIMESTAMP, txhash VARCHAR(255), fromAddress VARCHAR(255), toAddress VARCHAR(255), value BIGINT)`, tableName)
-			fmt.Println("createTableSQL", createTableSQL)
-			_, err = p.db.Exec(createTableSQL)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (p *PostgresDB) CreateTokensTransferTable(timestamp uint64) error {
-	tableName := p.getTokensTableNameByDate(timestamp)
-	exists, err := p.tableExists(tableName)
-	if err != nil {
-		fmt.Println("CreateTokensTransferTable get table information failed", "error", err)
-		return err
-	} else {
-		if exists {
-			return nil
-		} else { //coinid, blocknumber, timestamp, txhash, fromaddress, toaddress, value
-			createTableSQL := `CREATE TABLE ` + tableName + ` (coinID INTEGER,blocknumber BIGINT,timestamp TIMESTAMP，txhash VARCHAR(255), fromAddress VARCHAR(255),  toAddress VARCHAR(255), value BIGINT);`
-			_, err = p.db.Exec(createTableSQL)
-			if err != nil {
-				fmt.Println("CreateTokensTransferTable failed", "error", err)
-			}
-		}
-	}
-	return nil
-}
-
-func (p *PostgresDB) InsertTokenRecords(tableName string, records []*types.TokenRecord) error {
+func (p *PostgresDB) CreateRecordTable(tableName string) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	createTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ("+
+		"id SERIAL PRIMARY KEY,"+
+		"coinID INT,"+
+		"blocknumber INT,"+
+		"timestamp INT,"+
+		"txhash VARCHAR(66),"+
+		"fromAddress VARCHAR(42),"+
+		"toAddress VARCHAR(42),"+
+		"value TEXT"+
+		");", tableName)
+	_, err := p.db.Exec(createTableSQL)
+	if err != nil {
+		return errors.New(fmt.Sprintf("create sql table %s err: %v", tableName, err))
+	}
+
+	return nil
+}
+
+func (p *PostgresDB) InsertRecords(tableName string, records []*types.TokenRecord) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
 	tx, err := p.db.Begin()
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("db begin err: %v", err))
 	}
 	defer tx.Rollback()
+
 	for _, record := range records {
-		stmt, err := tx.Prepare("INSERT INTO " + tableName + "(coinID, blocknumber, timestamp, txhash, fromAddress, toAddress, value ) VALUES($1, $2, $3, $4, $5, $6, $7)")
+		sqlInsert := fmt.Sprintf("INSERT INTO %s ("+
+			"coinID,"+
+			"blocknumber,"+
+			"timestamp,"+
+			"txhash,"+
+			"fromAddress,"+
+			"toAddress,"+
+			"value"+
+			") VALUES ($1,$2,$3,$4,$5,$6,$7)", tableName)
+		stmt, err := tx.Prepare(sqlInsert)
 		if err != nil {
-			fmt.Println("InsertTokenRecords Prepare failed", "error", err)
-			return err
+			return errors.New(fmt.Sprintf("db prepare err: %v", err))
 		}
 		defer stmt.Close()
 
-		_, err = stmt.Exec(record.CoinID, record.BlockNumber, record.Timestamp, record.TxHash.String(), record.From.String(), record.To.String(), record.Value.Uint64())
+		_, err = stmt.Exec(record.CoinID, record.BlockNumber, record.Timestamp, record.TxHash.String(), record.From.String(), record.To.String(), record.Value.String())
 		if err != nil {
-			fmt.Println("InsertTokenRecords Exec failed", "error", err)
-			return err
+			return errors.New(fmt.Sprintf("db stmt exec err: %v", err))
 		}
 	}
+
 	// 提交事务
 	if err := tx.Commit(); err != nil {
-		fmt.Println("InsertTokenRecords Commit failed", "error", err)
-		return err
+		return errors.New(fmt.Sprintf("db tx commit err: %v", err))
 	}
+
 	return nil
 }
 

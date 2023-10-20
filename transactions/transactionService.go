@@ -3,17 +3,17 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/celo-org/celo-blockchain/common"
+	"github.com/celo-org/celo-blockchain/common/hexutil"
 	"github.com/celo-org/celo-blockchain/core/types"
 	"github.com/celo-org/celo-blockchain/params"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 	"github.com/xuxinlai2002/creda-celo-balance/db"
 	ctypes "github.com/xuxinlai2002/creda-celo-balance/types"
-	"math/big"
-	"time"
-
-	"github.com/celo-org/celo-blockchain/common/hexutil"
 	"github.com/xuxinlai2002/creda-celo-balance/utils"
 )
 
@@ -65,15 +65,15 @@ func (p *BlockPull) getTableNameByTimeStamp(timestamp uint64) string {
 	return date
 }
 func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
-	//p.dataBase.CreatePullTxTable()
+	//p.dataBase.CreateRecordTable()
 	for filename, datas := range records {
 		fmt.Println("filename", filename, "datas", datas)
-		err := p.dataBase.CreatePullTxTable(filename)
+		err := p.dataBase.CreateRecordTable(filename)
 		if err != nil {
-			fmt.Println("persistToDB CreatePullTxTable", "error", err)
+			fmt.Println("persistToDB CreateRecordTable", "error", err)
 			panic(any(err.Error()))
 		}
-		err = p.dataBase.InsertTokenRecords(filename, datas)
+		err = p.dataBase.InsertRecords(filename, datas)
 		if err != nil {
 			fmt.Println("persistToDB failed", "error", err)
 			panic(any(err.Error()))
