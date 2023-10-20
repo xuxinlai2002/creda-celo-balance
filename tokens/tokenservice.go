@@ -3,12 +3,15 @@ package tokens
 import (
 	"bufio"
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"time"
 
 	"github.com/celo-org/celo-blockchain/common"
+	_ "github.com/lib/pq"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 )
@@ -67,6 +70,73 @@ func saveToFile(date string, data []TokenRecord, cfg *config.Config) error {
 	return nil
 }
 
+func saveToPostgreSql(date string, data []TokenRecord) error {
+	// 连接数据库
+	dbName := "postgres"
+	userName := "postgres"
+	passwd := "12345678"
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s", userName, dbName, passwd))
+	if err != nil {
+		return errors.New(fmt.Sprintf("open sql err: %v", err))
+	}
+
+	defer db.Close()
+
+	// 创建表
+	tableName := fmt.Sprintf("event%s", date)
+	sqlCreateTable := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ("+
+		"id SERIAL PRIMARY KEY,"+
+		"coinid INT,"+
+		"blocknumber INT,"+
+		"timestamp INT,"+
+		"txhash VARCHAR(66),"+
+		"fromaddress VARCHAR(42),"+
+		"toaddress VARCHAR(42),"+
+		"value TEXT"+
+		");", tableName)
+	_, err = db.Exec(sqlCreateTable)
+	if err != nil {
+		return errors.New(fmt.Sprintf("create sql table %s err: %v", tableName, err))
+	}
+	fmt.Printf("create table: %s\n", tableName)
+
+	// 插入数据
+	tx, err := db.Begin()
+	if err != nil {
+		return errors.New(fmt.Sprintf("db begin err: %v", err))
+	}
+
+	for _, d := range data {
+		sqlInsert := fmt.Sprintf("INSERT INTO %s ("+
+			"coinid,"+
+			"blocknumber,"+
+			"timestamp,"+
+			"txhash,"+
+			"fromaddress,"+
+			"toaddress,"+
+			"value"+
+			") VALUES ($1,$2,$3,$4,$5,$6,$7)", tableName)
+		stmt, err := tx.Prepare(sqlInsert)
+		if err != nil {
+			return errors.New(fmt.Sprintf("db tx prepare err: %v", err))
+		}
+		defer stmt.Close()
+
+		if _, err := stmt.Exec(d.CoinID, d.BlockNumber, d.Timestamp, d.TxHash.String(), d.From.String(), d.To.String(), d.Value.String()); err != nil {
+			return errors.New(fmt.Sprintf("db stmt exec err: %v", err))
+		}
+	}
+
+	// 提交事务
+	if err := tx.Commit(); err != nil {
+		return errors.New(fmt.Sprintf("db tx commit err: %v", err))
+	}
+
+	fmt.Printf("saved into table %s\n", tableName)
+
+	return nil
+}
+
 func processERC20Tokens(cfg *config.Config) {
 	tokens := ERC20Tokens
 	distance := uint64(10000)
@@ -81,7 +151,7 @@ func processERC20Tokens(cfg *config.Config) {
 		} else {
 			toBlock = cfg.EndBlock
 		}
-		fmt.Printf("pull block %v from to %v\n", i, toBlock)
+		fmt.Printf("pull block from %v to %v\n", i, toBlock)
 		for address, tokenInfo := range tokens {
 			query := rpcClient.BuildQuery(address, logTransferSig, big.NewInt(0).SetUint64(i), big.NewInt(0).SetUint64(toBlock))
 			logs, err := rpcClient.FilterLogs(context.Background(), query)
@@ -125,9 +195,12 @@ func processERC20Tokens(cfg *config.Config) {
 						} else {
 							if len(tokenDaysData) > 0 {
 								for k, v := range tokenDaysData {
-									if err := saveToFile(k, v, cfg); err != nil {
-										fmt.Printf("save token event to file err: %v\n", err)
+									if err := saveToPostgreSql(k, v); err != nil {
+										fmt.Printf("save token event to db err: %v\n", err)
 									}
+									//if err := saveToFile(k, v); err != nil {
+									//	fmt.Printf("save token event to file err: %v\n", err)
+									//}
 									delete(tokenDaysData, k)
 								}
 							}

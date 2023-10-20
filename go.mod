@@ -2,8 +2,6 @@ module github.com/xuxinlai2002/creda-celo-balance
 
 go 1.20
 
-require github.com/lib/pq v1.0.0
-
 require (
 	filippo.io/edwards25519 v1.0.0-alpha.2 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
@@ -26,6 +24,7 @@ require (
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
+	github.com/lib/pq v1.10.9
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/gomega v1.10.1 // indirect

@@ -50,3 +50,5 @@ profile.cov
 dpos/logs/
 consensus/pbft/logs
 go.sum
+
+*.txt
