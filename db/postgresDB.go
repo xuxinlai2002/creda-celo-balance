@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,7 +32,12 @@ func CreateDataBase(dbName, user, password, host string, port uint32) error {
 	err = db.QueryRow(sql).Scan(&exist)
 	if err != nil {
 		fmt.Println("CreateDB query error", err)
-		return err
+		if !strings.Contains(err.Error(), "does not exist") {
+			return err
+		} else {
+			exist = false
+		}
+
 	}
 	if !exist {
 		_, err = db.Exec("CREATE DATABASE " + dbName)

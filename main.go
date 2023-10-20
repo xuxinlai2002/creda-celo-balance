@@ -22,7 +22,7 @@ func main() {
 	err = db.CreateDataBase(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHost, cfg.PostgresPort)
 	if err != nil {
 		fmt.Println("Create DataBase failed", "error", err)
-		panic(any(err.Error()))
+		//panic(any(err.Error()))
 	}
 
 	tokensService, err := tokens.NewService(cfg)
