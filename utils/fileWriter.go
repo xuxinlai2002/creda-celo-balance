@@ -7,17 +7,15 @@ import (
 
 const PullProgressFile = "progress.txt"
 
-func WriteCurrentHeight(filePath string, height uint64) error {
+func WriteCurrentHeight(height uint64) error {
 
 	content := big.NewInt(0).SetUint64(height)
-	name := filePath + PullProgressFile
-	err := os.WriteFile(name, content.Bytes(), 0666)
+	err := os.WriteFile(PullProgressFile, content.Bytes(), 0666)
 	return err
 }
 
 func GetCurrentHeight(filePath string) (uint64, error) {
-	name := filePath + PullProgressFile
-	data, err := os.ReadFile(name)
+	data, err := os.ReadFile(PullProgressFile)
 	if err != nil {
 		return 0, err
 	}

@@ -131,7 +131,7 @@ func (p *BlockPull) pullBlock() error {
 			}
 			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
 		}
-		utils.WriteCurrentHeight(p.config.OutputDir, b.NumberU64())
+		utils.WriteCurrentHeight(b.NumberU64())
 	}
 	return nil
 }
