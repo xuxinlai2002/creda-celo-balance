@@ -55,6 +55,7 @@ func (p *BlockPull) Start(results chan<- error) {
 	go func() {
 		err := p.pullBlock()
 		p.persistToDB(p.pullTxList)
+		p.dataBase.Close()
 		results <- err
 	}()
 }
@@ -66,7 +67,6 @@ func (p *BlockPull) getTableNameByTimeStamp(timestamp uint64) string {
 }
 func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
 	for filename, datas := range records {
-		fmt.Println("filename", filename, "datas", datas)
 		err := p.dataBase.CreateRecordTable(filename)
 		if err != nil {
 			fmt.Println("persistToDB CreateRecordTable", "error", err)
@@ -79,47 +79,6 @@ func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
 		}
 	}
 }
-
-//
-//func (p *BlockPull) saveTxToFile(datas map[string][]*tokens.TokenRecord) {
-//	for k, v := range datas {
-//		if err := p.saveToFile(k, v); err != nil {
-//			fmt.Printf("save transaction list to file err: %v\n", err)
-//		}
-//		delete(datas, k)
-//	}
-//}
-//
-//func (p *BlockPull) saveToFile(fileName string, data []*tokens.TokenRecord) error {
-//	filePath := p.config.OutputDir + fileName + ".txt"
-//	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0666)
-//	if err != nil {
-//		return err
-//	}
-//	defer f.Close()
-//	info, err := f.Stat()
-//	if err != nil {
-//		fmt.Println("Error getting file info:", "fileName", fileName, "error", err)
-//		return err
-//	}
-//	title := "coinID,blockNumber,timestamp, txHash,from,to,value\n"
-//	if info.Size() > 0 {
-//		title = ""
-//	}
-//
-//	_, err = f.WriteString(title)
-//	if err != nil {
-//		return err
-//	}
-//	for _, d := range data {
-//		line := fmt.Sprintf("%d,%d,%d,%s,%s,%s,%d\n", d.CoinID, d.BlockNumber, d.Timestamp, d.TxHash, d.From, d.To, d.Value)
-//		_, err = f.WriteString(line)
-//		if err != nil {
-//			return err
-//		}
-//	}
-//	return nil
-//}
 
 func (p *BlockPull) pullBlock() error {
 	p.pullTxList = make(map[string][]*ctypes.TokenRecord)
@@ -172,10 +131,7 @@ func (p *BlockPull) pullBlock() error {
 			}
 			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
 		}
-
-		if b.NumberU64()%1000 == 0 {
-			utils.WriteCurrentHeight(p.config.OutputDir, b.NumberU64())
-		}
+		utils.WriteCurrentHeight(p.config.OutputDir, b.NumberU64())
 	}
 	return nil
 }

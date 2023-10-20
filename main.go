@@ -5,6 +5,7 @@ import (
 	godebug "runtime/debug"
 
 	"github.com/xuxinlai2002/creda-celo-balance/config"
+	"github.com/xuxinlai2002/creda-celo-balance/db"
 	"github.com/xuxinlai2002/creda-celo-balance/tokens"
 	"github.com/xuxinlai2002/creda-celo-balance/transactions"
 )
@@ -15,6 +16,12 @@ func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		fmt.Println("tokens start failed", "error", err)
+		panic(any(err.Error()))
+	}
+
+	err = db.CreateDataBase(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHost, cfg.PostgresPort)
+	if err != nil {
+		fmt.Println("Create DataBase failed", "error", err)
 		panic(any(err.Error()))
 	}
 

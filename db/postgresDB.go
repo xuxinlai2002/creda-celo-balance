@@ -19,6 +19,29 @@ type PostgresDB struct {
 	lock sync.Mutex
 }
 
+func CreateDataBase(dbName, user, password, host string, port uint32) error {
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s  sslmode=disable password=%s host=%s port=%d", user, password, host, port))
+	if err != nil {
+		fmt.Println("failed open databases", err)
+		return err
+	}
+	defer db.Close()
+	var exist bool
+	sql := fmt.Sprintf("SELECT EXISTS (SELECT FROM pg_database WHERE datname = '%s')", dbName)
+	err = db.QueryRow(sql).Scan(&exist)
+	if err != nil {
+		fmt.Println("CreateDB query error", err)
+		return err
+	}
+	if !exist {
+		_, err = db.Exec("CREATE DATABASE " + dbName)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func NewDB(dbName, user, password, host string, port uint32) (*PostgresDB, error) {
 	db, err := sql.Open("postgres", fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s host=%s port=%d", user, dbName, password, host, port))
 	if err != nil {
