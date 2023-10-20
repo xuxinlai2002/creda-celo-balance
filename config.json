@@ -3,7 +3,7 @@
     "startBlock":2960,
     "endBlock":21874877,
     "postgresHost":"localhost",
-    "postgresPort": 5433,
+    "postgresPort": 5432,
     "postgresDBName": "postgres",
     "postgresUser": "postgres",
     "postgresPassword": "12345678",

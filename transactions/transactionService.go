@@ -38,7 +38,7 @@ func New(cfg *config.Config) (*BlockPull, error) {
 	if err != nil {
 		return nil, err
 	}
-	database, err := db.NewDB(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword)
+	database, err := db.NewDB(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHost, cfg.PostgresPort)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,6 @@ func (p *BlockPull) getTableNameByTimeStamp(timestamp uint64) string {
 	return date
 }
 func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
-	//p.dataBase.CreateRecordTable()
 	for filename, datas := range records {
 		fmt.Println("filename", filename, "datas", datas)
 		err := p.dataBase.CreateRecordTable(filename)

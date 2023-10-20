@@ -19,28 +19,12 @@ type PostgresDB struct {
 	lock sync.Mutex
 }
 
-func NewDB(dbName, user, password string) (*PostgresDB, error) {
-	db, err := sql.Open("postgres", fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s", user, dbName, password))
+func NewDB(dbName, user, password, host string, port uint32) (*PostgresDB, error) {
+	db, err := sql.Open("postgres", fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s host=%s port=%d", user, dbName, password, host, port))
 	if err != nil {
 		fmt.Println("failed open databases", err)
 		return nil, err
 	}
-
-	//var dbExists bool
-	//err = db.QueryRow("SELECT COUNT(*) FROM pg_database WHERE datname = $1", dbName).Scan(&dbExists)
-	//if err != nil {
-	//	dbExists = false
-	//}
-	//if !dbExists {
-	//	_, err = db.Exec("CREATE DATABASE" + dbName)
-	//	if err != nil {
-	//		fmt.Println("CREATE dataasee！", err)
-	//		return nil, err
-	//	}
-	//	fmt.Println("database create suc！")
-	//} else {
-	//	fmt.Println("database existeds！")
-	//}
 
 	self := &PostgresDB{
 		db: db,

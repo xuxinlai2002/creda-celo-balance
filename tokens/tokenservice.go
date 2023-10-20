@@ -28,7 +28,7 @@ func NewService(cfg *config.Config) (*TokenService, error) {
 		return nil, err
 	}
 
-	database, err := db.NewDB(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword)
+	database, err := db.NewDB(cfg.PostgresDBName, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHost, cfg.PostgresPort)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("new db err: %v", err))
 	}
