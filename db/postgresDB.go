@@ -4,10 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	_ "github.com/lib/pq"
 	"math/big"
 	"sync"
 	"time"
+
+	_ "github.com/lib/pq"
 
 	"github.com/celo-org/celo-blockchain/common"
 	"github.com/xuxinlai2002/creda-celo-balance/types"
@@ -195,7 +196,10 @@ func (p *PostgresDB) getTokensTableNameByDate(timestamp uint64) string {
 }
 
 func (p *PostgresDB) tableExists(tableName string) (bool, error) {
-	str := fmt.Sprintf("SELECT * FROM information_schema.tables WHERE table_schema =%s AND table_name=%s;", "postgres", tableName)
+	str := fmt.Sprintf("SELECT * FROM information_schema.tables WHERE table_schema ='%s' AND table_name='%s';", "public", tableName)
+
+	fmt.Printf("str is %s", str)
+
 	var exists bool
 	err := p.db.QueryRow(str).Scan(&exists)
 	if err != nil {
