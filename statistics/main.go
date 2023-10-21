@@ -1,9 +1,11 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/xuxinlai2002/creda-celo-balance/config"
+	"github.com/xuxinlai2002/creda-celo-balance/statistics/account"
 )
 
 func main() {
@@ -13,9 +15,7 @@ func main() {
 		panic(any(err.Error()))
 	}
 
-	db, err := sql.Open("postgres", fmt.Sprintf("user=%s dbname=%s sslmode=disable password=%s", user, dbName, password))
-	if err != nil {
-		g.Log().Error(ctx, err)
-	}
-	defer db.Close()
+	bal, err := account.New(cfg)
+	bal.Start()
+	time.Sleep(10 * time.Second)
 }

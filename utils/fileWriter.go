@@ -14,7 +14,7 @@ func WriteCurrentHeight(height uint64) error {
 	return err
 }
 
-func GetCurrentHeight(filePath string) (uint64, error) {
+func GetCurrentHeight() (uint64, error) {
 	data, err := os.ReadFile(PullProgressFile)
 	if err != nil {
 		return 0, err

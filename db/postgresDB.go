@@ -127,13 +127,13 @@ func (p *PostgresDB) InsertRecords(tableName string, records []*types.TokenRecor
 	return nil
 }
 
-func (p *PostgresDB) ReadPullTxHistory(timestamp uint64) ([]*types.TokenRecord, error) {
-	tableName := p.getPullTxTableNameByDate(timestamp)
+func (p *PostgresDB) ReadPullTxHistory(t time.Time) ([]*types.TokenRecord, error) {
+	tableName := p.getPullTxTableNameByDate(t)
 	return p.queryTable(tableName)
 }
 
-func (p *PostgresDB) ReadTokenTransferHistory(timestamp uint64) ([]*types.TokenRecord, error) {
-	tableName := p.getTokensTableNameByDate(timestamp)
+func (p *PostgresDB) ReadTokenTransferHistory(t time.Time) ([]*types.TokenRecord, error) {
+	tableName := p.getTokensTableNameByDate(t)
 	return p.queryTable(tableName)
 }
 
@@ -187,16 +187,13 @@ func (p *PostgresDB) queryTable(tableName string) ([]*types.TokenRecord, error) 
 	return records, err
 }
 
-func (p *PostgresDB) getPullTxTableNameByDate(timestamp uint64) string {
-	t := time.Unix(int64(timestamp), 0)
+func (p *PostgresDB) getPullTxTableNameByDate(t time.Time) string {
 	tableName := fmt.Sprintf("tx_%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
 	return tableName
 }
 
-func (p *PostgresDB) getTokensTableNameByDate(timestamp uint64) string {
-	t := time.Unix(int64(timestamp), 0)
-	date := fmt.Sprintf("%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
-	tableName := fmt.Sprintf("event%v.txt", date)
+func (p *PostgresDB) getTokensTableNameByDate(t time.Time) string {
+	tableName := fmt.Sprintf("event%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
 	return tableName
 }
 

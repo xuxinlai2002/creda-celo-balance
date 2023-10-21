@@ -15,7 +15,6 @@ type Config struct {
 	EndBlock   uint64 `json:"endBlock,omitempty"`
 
 	PostgresDBName   string `json:"postgresDBName,omitempty"`
-	PostgresTable    string `json:"postgresTable,omitempty"`
 	PostgresHost     string `json:"postgresHost,omitempty"`
 	PostgresPort     uint32 `json:"postgresPort,omitempty"`
 	PostgresUser     string `json:"postgresUser,omitempty"`
@@ -24,8 +23,8 @@ type Config struct {
 	PullStartHeight uint64 `json:"pullStartHeight,omitempty"`
 	PullEndHeight   uint64 `json:"pullEndHeight,omitempty"`
 
-	OutputDir  string `json:"outputDir,omitempty"`
-	ResultPath string `json:"resultPath,omitempty"`
+	StatisticsDateBegin string `json:"statisticsDateBegin,omitempty"`
+	StatisticsDateEnd   string `json:"statisticsDateEnd,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -34,7 +33,6 @@ func DefaultConfig() Config {
 		StartBlock:       0,
 		EndBlock:         0,
 		PostgresDBName:   "",
-		PostgresTable:    "",
 		PostgresHost:     "",
 		PostgresPort:     5432,
 		PostgresUser:     "",
@@ -43,8 +41,8 @@ func DefaultConfig() Config {
 		PullStartHeight: 0,
 		PullEndHeight:   0,
 
-		OutputDir:  "",
-		ResultPath: "",
+		StatisticsDateBegin: "",
+		StatisticsDateEnd:   "",
 	}
 }
 
@@ -76,9 +74,6 @@ func (cfg *Config) ValidateConfig() error {
 	}
 	if cfg.PostgresDBName == "" {
 		return errors.New("PostgresDBName is empty")
-	}
-	if cfg.PostgresTable == "" {
-		return errors.New("PostgresTable is empty")
 	}
 	if cfg.PostgresHost == "" {
 		return errors.New("PostgresHost is empty")

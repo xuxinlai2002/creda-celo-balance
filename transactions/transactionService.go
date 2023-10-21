@@ -8,8 +8,6 @@ import (
 
 	"github.com/celo-org/celo-blockchain/common"
 	"github.com/celo-org/celo-blockchain/common/hexutil"
-	"github.com/celo-org/celo-blockchain/core/types"
-	"github.com/celo-org/celo-blockchain/params"
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 	"github.com/xuxinlai2002/creda-celo-balance/db"
@@ -20,7 +18,7 @@ import (
 type InternalTx struct {
 	From  string
 	To    string
-	Value uint64
+	Value *big.Int
 	Calls string
 	Type  string
 }
@@ -55,6 +53,7 @@ func (p *BlockPull) Start(results chan<- error) {
 	go func() {
 		err := p.pullBlock()
 		p.persistToDB(p.pullTxList)
+		p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 		p.dataBase.Close()
 		results <- err
 	}()
@@ -83,7 +82,7 @@ func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
 func (p *BlockPull) pullBlock() error {
 	p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 	startHeight := p.config.PullStartHeight
-	progress, err := utils.GetCurrentHeight(p.config.OutputDir)
+	progress, err := utils.GetCurrentHeight()
 	if err == nil && progress > startHeight {
 		startHeight = progress + 1
 	}
@@ -96,40 +95,23 @@ func (p *BlockPull) pullBlock() error {
 		}
 		filePath := p.getTableNameByTimeStamp(b.Time())
 		if _, ok := p.pullTxList[filePath]; !ok {
-			if i > startHeight {
+			if len(p.pullTxList) > 0 {
 				p.persistToDB(p.pullTxList)
 				p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 			}
 		}
-		signer := types.MakeSigner(params.MainnetChainConfig, b.Number())
 		fmt.Println("getBlock", b.NumberU64())
 		for _, tx := range b.Transactions() {
 			fmt.Println("trace tx", tx.Hash().String())
-			if tx.Value().Cmp(big.NewInt(0)) > 0 {
-				from, errMsg := types.Sender(signer, tx)
-				if errMsg == nil {
-					coinID, ok := big.NewInt(0).SetString(p.coinID, 10)
-					if !ok {
-						fmt.Println("CoinID is not correct", "coinID", p.coinID)
-					}
-					tr := &ctypes.TokenRecord{
-						CoinID:      coinID.Uint64(),
-						BlockNumber: b.NumberU64(),
-						Timestamp:   b.Header().Time,
-						TxHash:      tx.Hash(),
-						From:        from,
-						To:          *tx.To(),
-						Value:       tx.Value(),
-					}
-					p.addPullTxRecord(filePath, tr)
-				}
-			}
-
 			info, err := p.client.TraceTx(ctx, tx.Hash().String())
 			if err != nil {
 				return err
 			}
+			if info["error"] != nil {
+				continue
+			}
 			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
+
 		}
 		utils.WriteCurrentHeight(b.NumberU64())
 	}
@@ -137,11 +119,10 @@ func (p *BlockPull) pullBlock() error {
 }
 
 func (p *BlockPull) addPullTxRecord(filePath string, tr *ctypes.TokenRecord) {
-	if _, ok := p.pullTxList[filePath]; ok {
-		p.pullTxList[filePath] = append(p.pullTxList[filePath], tr)
-	} else {
-		p.pullTxList[filePath] = []*ctypes.TokenRecord{tr}
+	if _, ok := p.pullTxList[filePath]; !ok {
+		p.pullTxList[filePath] = make([]*ctypes.TokenRecord, 0)
 	}
+	p.pullTxList[filePath] = append(p.pullTxList[filePath], tr)
 }
 
 func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID common.Hash, blockHeight, timestamp uint64, filePath string) {
@@ -150,10 +131,15 @@ func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID co
 		To:   txInfo["to"].(string),
 		Type: txInfo["type"].(string),
 	}
-	if v, ok := txInfo["value"]; ok {
-		tx.Value, _ = hexutil.DecodeUint64(v.(string))
+	if txInfo["value"] != nil {
+		v, err := hexutil.DecodeBig(txInfo["value"].(string))
+		if err != nil {
+			fmt.Println("decode value error", "errorInfo", err)
+			panic(any(err.Error()))
+		}
+		tx.Value = v
 	}
-	if tx.Value != 0 && tx.Type == "CALL" {
+	if tx.Value != nil && tx.Value.Cmp(big.NewInt(0)) > 0 && tx.Type == "CALL" {
 		coinID, ok := big.NewInt(0).SetString(p.coinID, 10)
 		if !ok {
 			fmt.Println("CoinID is not correct", "coinID", p.coinID)
@@ -165,7 +151,7 @@ func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID co
 			TxHash:      txID,
 			From:        common.HexToAddress(tx.From),
 			To:          common.HexToAddress(tx.To),
-			Value:       big.NewInt(0).SetUint64(tx.Value),
+			Value:       tx.Value,
 		}
 		p.addPullTxRecord(filePath, tr)
 	}
