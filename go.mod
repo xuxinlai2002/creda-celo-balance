@@ -56,3 +56,5 @@ require (
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 )
+
+require github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f

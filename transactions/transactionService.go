@@ -3,7 +3,9 @@ package transactions
 import (
 	"context"
 	"fmt"
+	"github.com/xuxinlai2002/creda-celo-balance/signal"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/celo-org/celo-blockchain/common"
@@ -29,9 +31,10 @@ type BlockPull struct {
 	coinID     string
 	pullTxList map[string][]*ctypes.TokenRecord
 	dataBase   *db.PostgresDB
+	wg         *sync.WaitGroup
 }
 
-func New(cfg *config.Config) (*BlockPull, error) {
+func New(cfg *config.Config, wg *sync.WaitGroup) (*BlockPull, error) {
 	cli, err := client.Dial(cfg.HTTP)
 	if err != nil {
 		return nil, err
@@ -45,17 +48,19 @@ func New(cfg *config.Config) (*BlockPull, error) {
 		config:   cfg,
 		coinID:   "5567",
 		dataBase: database,
+		wg:       wg,
 	}
 	return pull, nil
 }
 
-func (p *BlockPull) Start(results chan<- error) {
+func (p *BlockPull) Start(interceptor signal.Interceptor) {
+	p.wg.Add(1)
 	go func() {
-		err := p.pullBlock()
+		defer p.wg.Done()
+		p.pullBlock(interceptor)
 		p.persistToDB(p.pullTxList)
-		p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 		p.dataBase.Close()
-		results <- err
+		fmt.Println("tx service finished")
 	}()
 }
 
@@ -79,7 +84,7 @@ func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
 	}
 }
 
-func (p *BlockPull) pullBlock() error {
+func (p *BlockPull) pullBlock(interceptor signal.Interceptor) error {
 	p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 	startHeight := p.config.PullStartHeight
 	progress, err := utils.GetCurrentHeight()
@@ -89,32 +94,40 @@ func (p *BlockPull) pullBlock() error {
 	endHeight := p.config.PullEndHeight
 	ctx := context.Background()
 	for i := startHeight; i <= endHeight; i++ {
-		b, err := p.client.BlockByNumber(ctx, big.NewInt(0).SetUint64(i))
-		if err != nil {
-			return err
-		}
-		filePath := p.getTableNameByTimeStamp(b.Time())
-		if _, ok := p.pullTxList[filePath]; !ok {
-			if len(p.pullTxList) > 0 {
-				p.persistToDB(p.pullTxList)
-				p.pullTxList = make(map[string][]*ctypes.TokenRecord)
-			}
-		}
-		fmt.Println("getBlock", b.NumberU64())
-		for _, tx := range b.Transactions() {
-			fmt.Println("trace tx", tx.Hash().String())
-			info, err := p.client.TraceTx(ctx, tx.Hash().String())
+		select {
+		default:
+			b, err := p.client.BlockByNumber(ctx, big.NewInt(0).SetUint64(i))
 			if err != nil {
 				return err
 			}
-			if info["error"] != nil {
-				continue
+			filePath := p.getTableNameByTimeStamp(b.Time())
+			if _, ok := p.pullTxList[filePath]; !ok {
+				if len(p.pullTxList) > 0 {
+					p.persistToDB(p.pullTxList)
+					p.pullTxList = make(map[string][]*ctypes.TokenRecord)
+				}
 			}
-			p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
+			fmt.Println("getBlock", b.NumberU64())
+			for _, tx := range b.Transactions() {
+				fmt.Println("trace tx", tx.Hash().String())
+				info, err := p.client.TraceTx(ctx, tx.Hash().String())
+				if err != nil {
+					return err
+				}
+				if info["error"] != nil {
+					continue
+				}
+				p.processInteralTxsInfo(info, tx.Hash(), b.NumberU64(), b.Time(), filePath)
 
+			}
+			utils.WriteCurrentHeight(b.NumberU64())
+
+		case <-interceptor.ShutdownChannel():
+			fmt.Println("tx service shutting down...")
+			return nil
 		}
-		utils.WriteCurrentHeight(b.NumberU64())
 	}
+
 	return nil
 }
 
