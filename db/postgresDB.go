@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -208,4 +209,72 @@ func (p *PostgresDB) tableExists(tableName string) (bool, error) {
 		return false, err
 	}
 	return exists, nil
+}
+
+func (p *PostgresDB) CreateBalanceTable(tableName string) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	createTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s ("+
+		"id SERIAL PRIMARY KEY,"+
+		"date DATE,"+
+		"address VARCHAR(42),"+
+		"value TEXT"+
+		");", tableName)
+	_, err := p.db.Exec(createTableSQL)
+	if err != nil {
+		return errors.New(fmt.Sprintf("create balance table %s err: %v", tableName, err))
+	}
+	return nil
+}
+
+func (p *PostgresDB) InsertAccountHistoryBalance(tableName string, dateStr types.DATE, history map[types.ADDRESS]map[types.COINID]*big.Int, cmcHistory map[types.COINID]map[types.DATE]*big.Float) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for address, coinBalances := range history {
+		balanceF := new(big.Float)
+		for coinID, balance := range coinBalances {
+			price := big.NewFloat(0)
+			if cmcHistory[coinID] != nil && cmcHistory[coinID][dateStr] != nil {
+				price = cmcHistory[coinID][dateStr]
+			}
+			// change balance to positive
+			if balance.Sign() < 0 {
+				str := fmt.Sprintf("balance is positive address:%s, date:%s, coinID:%v", address, dateStr, coinID)
+				panic(any(str))
+			}
+			decimal := TokenDecimals[coinID]
+			// balance with decimal * price
+			balanceWithPrice := new(big.Float).SetInt(balance)
+			balanceWithPrice.Quo(balanceWithPrice, new(big.Float).SetFloat64(math.Pow(float64(10), float64(decimal))))
+			balanceWithPrice.Mul(balanceWithPrice, price)
+
+			balanceF.Add(balanceF, balanceWithPrice)
+		}
+		// if balanceF equal 0, then continue
+		if balanceF.Cmp(big.NewFloat(0)) == 0 {
+			continue
+		}
+
+		stmt, err := tx.Prepare("INSERT INTO " + tableName + "(date, address, value) VALUES($1, $2, $3)")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
+		fmt.Println("insert into " + tableName + " " + string(dateStr) + " " + string(address) + " " + balanceF.Text('f', 18))
+		_, err = stmt.Exec(dateStr, address, balanceF.Text('f', 18))
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("###### start commit:", tableName)
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }

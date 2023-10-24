@@ -25,23 +25,3 @@ var ERC20Tokens = map[string]TokenInfo{
 	"0x17700282592D6917F6A73D0bF8AcCf4D578c131e": TokenInfo{Name: "MOO", CoinID: 13021, Decimals: 18},
 	"0xe8537a3d056DA446677B9E9d6c5dB704EaAb4787": TokenInfo{Name: "CREAL", CoinID: 16385, Decimals: 18},
 }
-
-var TokenDecimals = map[string]int{
-	"825":   6,
-	"3408":  6,
-	"20650": 6,
-	"3717":  18,
-	"5567":  18,
-	"6758":  18,
-	"10238": 18,
-	"9467":  18,
-	"8442":  18,
-	"7236":  18,
-	"17334": 18,
-	"15575": 9,
-	"9588":  18,
-	"12212": 18,
-	"10808": 18,
-	"13021": 18,
-	"16385": 18,
-}

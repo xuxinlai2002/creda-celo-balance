@@ -25,6 +25,8 @@ type Config struct {
 
 	StatisticsDateBegin string `json:"statisticsDateBegin,omitempty"`
 	StatisticsDateEnd   string `json:"statisticsDateEnd,omitempty"`
+
+	CoinHistoryPrice string `json:"coinPriceHistory,omitempty"`
 }
 
 func DefaultConfig() Config {
@@ -80,6 +82,10 @@ func (cfg *Config) ValidateConfig() error {
 	}
 	if cfg.PostgresPort == 0 {
 		return errors.New("PostgresPort is 0")
+	}
+
+	if cfg.CoinHistoryPrice == "" {
+		return errors.New("CoinHistoryPrice is empty")
 	}
 	return nil
 }
