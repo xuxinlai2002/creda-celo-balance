@@ -13,7 +13,8 @@
     "outputDir":"./history/recordTx/",
     "resultPath":"./history/recordValue/",
     "statisticsDateBegin":"2020-04-23",
-    "statisticsDateEnd":"2023-10-20"
+    "statisticsDateEnd":"2023-10-20",
+    "coinPriceHistory":"history_price.txt"
 }
 
 

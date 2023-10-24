@@ -46,7 +46,7 @@ func New(cfg *config.Config, wg *sync.WaitGroup) (*BlockPull, error) {
 	pull := &BlockPull{
 		client:   cli,
 		config:   cfg,
-		coinID:   "5567",
+		coinID:   big.NewInt(ctypes.CELO_COINID).String(),
 		dataBase: database,
 		wg:       wg,
 	}

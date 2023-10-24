@@ -6,6 +6,8 @@ import (
 	"github.com/celo-org/celo-blockchain/common"
 )
 
+const CELO_COINID = 5567
+
 type TokenRecord struct {
 	CoinID      uint64
 	BlockNumber uint64
@@ -15,3 +17,7 @@ type TokenRecord struct {
 	To          common.Address
 	Value       *big.Int
 }
+
+type COINID uint64
+type ADDRESS string
+type DATE string
