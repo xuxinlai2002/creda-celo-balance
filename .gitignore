@@ -52,3 +52,4 @@ consensus/pbft/logs
 go.sum
 
 *.txt
+*.log

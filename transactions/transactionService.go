@@ -3,7 +3,6 @@ package transactions
 import (
 	"context"
 	"fmt"
-	"github.com/xuxinlai2002/creda-celo-balance/signal"
 	"math/big"
 	"sync"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 	"github.com/xuxinlai2002/creda-celo-balance/db"
+	"github.com/xuxinlai2002/creda-celo-balance/signal"
 	ctypes "github.com/xuxinlai2002/creda-celo-balance/types"
 	"github.com/xuxinlai2002/creda-celo-balance/utils"
 )
@@ -60,7 +60,7 @@ func (p *BlockPull) Start(interceptor signal.Interceptor) {
 		p.pullBlock(interceptor)
 		p.persistToDB(p.pullTxList)
 		p.dataBase.Close()
-		fmt.Println("tx service finished")
+		log.Infof("tx service finished")
 	}()
 }
 
@@ -73,12 +73,12 @@ func (p *BlockPull) persistToDB(records map[string][]*ctypes.TokenRecord) {
 	for filename, datas := range records {
 		err := p.dataBase.CreateRecordTable(filename)
 		if err != nil {
-			fmt.Println("persistToDB CreateRecordTable", "error", err)
+			log.Errorf("persistToDB CreateRecordTable err: %v", err)
 			panic(any(err.Error()))
 		}
 		err = p.dataBase.InsertRecords(filename, datas)
 		if err != nil {
-			fmt.Println("persistToDB failed", "error", err)
+			log.Errorf("persistToDB failed, err: %v", err)
 			panic(any(err.Error()))
 		}
 	}
@@ -107,9 +107,9 @@ func (p *BlockPull) pullBlock(interceptor signal.Interceptor) error {
 					p.pullTxList = make(map[string][]*ctypes.TokenRecord)
 				}
 			}
-			fmt.Println("getBlock", b.NumberU64())
+			log.Infof("getBlock %v", b.NumberU64())
 			for _, tx := range b.Transactions() {
-				fmt.Println("trace tx", tx.Hash().String())
+				log.Infof("trace tx %v", tx.Hash())
 				info, err := p.client.TraceTx(ctx, tx.Hash().String())
 				if err != nil {
 					return err
@@ -123,7 +123,7 @@ func (p *BlockPull) pullBlock(interceptor signal.Interceptor) error {
 			utils.WriteCurrentHeight(b.NumberU64())
 
 		case <-interceptor.ShutdownChannel():
-			fmt.Println("tx service shutting down...")
+			log.Infof("tx service shutting down...")
 			return nil
 		}
 	}
@@ -147,7 +147,7 @@ func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID co
 	if txInfo["value"] != nil {
 		v, err := hexutil.DecodeBig(txInfo["value"].(string))
 		if err != nil {
-			fmt.Println("decode value error", "errorInfo", err)
+			log.Errorf("decode value error: %v", err)
 			panic(any(err.Error()))
 		}
 		tx.Value = v
@@ -155,7 +155,7 @@ func (p *BlockPull) processInteralTxsInfo(txInfo map[string]interface{}, txID co
 	if tx.Value != nil && tx.Value.Cmp(big.NewInt(0)) > 0 && tx.Type == "CALL" {
 		coinID, ok := big.NewInt(0).SetString(p.coinID, 10)
 		if !ok {
-			fmt.Println("CoinID is not correct", "coinID", p.coinID)
+			log.Warnf("CoinID %v is not correct", p.coinID)
 		}
 		tr := &ctypes.TokenRecord{
 			CoinID:      coinID.Uint64(),
