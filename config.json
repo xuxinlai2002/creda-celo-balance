@@ -1,4 +1,8 @@
 {
+    "debugLevel":"info",
+    "logDir": "",
+    "maxLogFiles": 1,
+    "MaxLogFileSize": 100,
     "http":"https://solitary-responsive-putty.celo-mainnet.quiknode.pro/40a3938f2f03f6ae973996eccf6106a9ab27c418",
     "startBlock":2960,
     "endBlock":21874877,

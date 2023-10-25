@@ -31,7 +31,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/rjeczalik/notify v0.9.1 // indirect
-	github.com/stretchr/testify v1.8.2 // indirect
+	github.com/stretchr/testify v1.8.2
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	golang.org/x/net v0.15.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
@@ -57,4 +57,12 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 )
 
-require github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
+require (
+	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f
+	github.com/jrick/logrotate v1.0.0
+)
+
+require (
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

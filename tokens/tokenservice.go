@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/xuxinlai2002/creda-celo-balance/signal"
-	"github.com/xuxinlai2002/creda-celo-balance/utils"
 	"math/big"
 	"sync"
 	"time"
@@ -15,7 +13,9 @@ import (
 	"github.com/xuxinlai2002/creda-celo-balance/client"
 	"github.com/xuxinlai2002/creda-celo-balance/config"
 	"github.com/xuxinlai2002/creda-celo-balance/db"
+	"github.com/xuxinlai2002/creda-celo-balance/signal"
 	ctypes "github.com/xuxinlai2002/creda-celo-balance/types"
+	"github.com/xuxinlai2002/creda-celo-balance/utils"
 )
 
 type TokenService struct {
@@ -67,7 +67,7 @@ func (s *TokenService) persistToDB(date string, records []*ctypes.TokenRecord) e
 		return errors.New(fmt.Sprintf("token service persist db err: %v", err))
 	}
 
-	fmt.Printf("saved into table %s\n", tableName)
+	log.Infof("saved into table %s", tableName)
 
 	return nil
 }
@@ -81,7 +81,7 @@ func (s *TokenService) processERC20Tokens(interceptor signal.Interceptor) {
 	startHeight := s.cfg.StartBlock
 
 	progress, err := utils.GetTokenCurrentHeight()
-	fmt.Println("token start height: ", progress)
+	log.Infof("token start height: %v", progress)
 	if err == nil && progress > startHeight {
 		startHeight = progress + 1
 	}
@@ -92,23 +92,22 @@ func (s *TokenService) processERC20Tokens(interceptor signal.Interceptor) {
 		} else {
 			toBlock = s.cfg.EndBlock
 		}
-		fmt.Printf("pull block from %v to %v\n", i, toBlock)
+		log.Infof("pull block from %v to %v", i, toBlock)
 		for address, tokenInfo := range tokens {
 			select {
 			default:
 				query := s.cli.BuildQuery(address, logTransferSig, big.NewInt(0).SetUint64(i), big.NewInt(0).SetUint64(toBlock))
 				logs, err := s.cli.FilterLogs(context.Background(), query)
 				if err != nil {
-					fmt.Printf("filter logs failed, error: %v\n", err)
+					log.Errorf("filter logs failed, error: %v", err)
 				} else if len(logs) > 0 {
-					fmt.Printf("addr: %v, len(logs): %v\n", address, len(logs))
-					//fmt.Println("Date,CoinID,BlockNumber,Time,TxHash,From,To,Value")
+					log.Infof("addr: %v, len(logs): %v", address, len(logs))
 					for _, vlog := range logs {
 						bn := big.NewInt(0)
 						bn.SetUint64(vlog.BlockNumber)
 						b, err := s.cli.BlockByNumber(context.Background(), bn)
 						if err != nil {
-							fmt.Printf("rpc.BlockByNumber err: %v\n", err)
+							log.Errorf("rpc.BlockByNumber err: %v", err)
 						} else {
 							tr := &ctypes.TokenRecord{
 								CoinID:      tokenInfo.CoinID,
@@ -126,9 +125,6 @@ func (s *TokenService) processERC20Tokens(interceptor signal.Interceptor) {
 							t := time.Unix(int64(tr.Timestamp), 0)
 							date := fmt.Sprintf("%04d%02d%02d", t.Year(), int(t.Month()), t.Day())
 
-							//fmt.Printf("-> %v,%v(%v),%v,%v,%s,%s,%s,%d\n",
-							//	date, tr.CoinID, tokenInfo.Name, tr.BlockNumber, tr.Timestamp, tr.TxHash, tr.From, tr.To, tr.Value)
-
 							if _, ok := s.records[date]; ok {
 								s.records[date] = append(s.records[date], tr)
 							} else {
@@ -141,7 +137,7 @@ func (s *TokenService) processERC20Tokens(interceptor signal.Interceptor) {
 										go func() {
 											s.wg.Done()
 											if err := s.persistToDB(k, records); err != nil {
-												fmt.Printf("persist token event to db err: %v\n", err)
+												log.Errorf("persist token event to db err: %v", err)
 											}
 										}()
 									}
@@ -154,7 +150,7 @@ func (s *TokenService) processERC20Tokens(interceptor signal.Interceptor) {
 				}
 
 			case <-interceptor.ShutdownChannel():
-				fmt.Println("token service shutting down...")
+				log.Infof("token service shutting down...")
 				goto shutdown
 			}
 		}
@@ -164,7 +160,7 @@ shutdown:
 	if len(s.records) > 0 {
 		for k, v := range s.records {
 			if err := s.persistToDB(k, v); err != nil {
-				fmt.Printf("persist token event to db err: %v\n", err)
+				log.Errorf("persist token event to db err: %v", err)
 			}
 
 			delete(s.records, k)
@@ -172,5 +168,5 @@ shutdown:
 	}
 
 	s.database.Close()
-	fmt.Println("token service finished")
+	log.Infof("token service finished")
 }
