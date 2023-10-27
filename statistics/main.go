@@ -18,6 +18,10 @@ func main() {
 	}
 
 	bal, err := account.New(cfg, &wg)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("token start height: %v", err))
+		panic(any(err))
+	}
 	bal.Start()
 
 	wg.Wait()
