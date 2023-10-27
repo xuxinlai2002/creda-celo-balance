@@ -73,6 +73,9 @@ func (a *Account) loadCoinPrice(path string) error {
 	scanner := bufio.NewScanner(coinHistoryFile)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if line == "" {
+			continue
+		}
 		var coinid, dateStr, priceStr string
 		_, err := fmt.Sscanf(line, "%s %s %s", &coinid, &dateStr, &priceStr)
 		if err != nil {
